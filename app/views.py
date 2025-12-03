@@ -1,29 +1,49 @@
-from django.db.models import Sum
-from django.db.models.functions import ExtractYear
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from app.models import RepositoryLanguage
+from rest_framework import status
+from django.db.models import Sum
+from django.core.cache import cache
+from .models import RepoLanguage
+from .serializers import TopRepoSerializer
 
-class TopLanguagesByYear(APIView):
+class TopRepoLangBy5Year(APIView):
     def get(self, request):
-        data = (
-            RepositoryLanguage.objects
-            .values(year=ExtractYear('repository__created_at'), language='language__name')
+        print(f"request ===== {request}")
+        try:
+            year = int(request.query_params.get('year',2024))
+        except ValueError:
+            return Response({"detail": "year must be integer"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            limit = int(request.query_params.get('limit', 5))
+        except ValueError:
+            limit = 5
+
+        cache_key = f"top_langs_by_size: {year}:{limit}"
+        cached = cache.get(cache_key)
+
+        if cached is not None:
+            return Response(cached)
+        qs = (
+            RepoLanguage.objects
+            .filter(repo__created_year=year)
+            .values('language__name')
             .annotate(total_size=Sum('size'))
-            .order_by('year', '-total_size')
+            .order_by('-total_size')[:limit]
         )
 
-        result = {}
-        for item in data:
-            year = str(item['year'])
-            result.setdefault(year, [])
-            if len(result[year]) < 5:
-                result[year].append({
-                    'language': item['language'],
-                    'total_size': item['total_size']
-                })
+        data = [
+            {
+                'language': item.get('language__name'),
+                'total_size': int(item.get('total_size') or 0),
+                'year': year,
+            }
+            for item in qs
+        ]
 
-        return Response(result)
+        cache.set(cache_key, data, 60*60)
+        serializer = TopRepoSerializer(data,many=True)
 
+        return Response(serializer.data) 
     
 

@@ -33,6 +33,7 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_swagger',
+    'clickhouse_backend',
 
     'django.contrib.admin',
     'django.contrib.auth',
@@ -83,6 +84,16 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+CLICKHOUSE_SETTINGS = {
+    "host": "localhost",
+    "port": 9000,
+    "database": "github_analyitics",
+    "user": "default",
+    "password": "",
+}
+
+# DATABASE_ROUTERS = ['dbrouters.ClickHouseRouter']
 
 
 # Password validation
